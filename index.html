@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mostrador Pro IA - Copiloto Comercial, Posnet & Turnos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans pb-16">
+
+    <!-- Barra Superior Principal -->
+    <header class="bg-slate-800 border-b border-slate-700 py-3 px-6 sticky top-0 z-20 shadow-lg">
+        <div class="max-w-6xl mx-auto flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-emerald-500 text-slate-950 font-black px-3 py-1.5 rounded-lg text-lg shadow">MP</div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white">Mostrador Pro <span class="text-emerald-400">IA</span></h1>
+                    <p class="text-[11px] text-slate-400">Cotizador Posnet + Agenda de Turnos + Lector WhatsApp</p>
+                </div>
+            </div>
+
+            <!-- BARRA DE HERRAMIENTAS DEL COMERCIANTE -->
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="abrirModal('modalPosnet')" class="bg-slate-700 hover:bg-slate-600 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-600 flex items-center gap-1.5 transition">
+                    💳 Configurar Posnet / Cuotas
+                </button>
+                <button onclick="abrirModal('modalCalendario')" class="bg-slate-700 hover:bg-slate-600 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-600 flex items-center gap-1.5 transition">
+                    📅 Turnos y Google Calendar
+                </button>
+                <button onclick="abrirModal('modalPromos')" class="bg-slate-700 hover:bg-slate-600 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-600 flex items-center gap-1.5 transition">
+                    🏷️ Promos de Tarjetas
+                </button>
+                <button onclick="abrirModal('modalTutorial')" class="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-bold px-3 py-2 rounded-lg border border-blue-500/40 flex items-center gap-1.5 transition">
+                    ❓ Tutorial
+                </button>
+            </div>
+            
+            <!-- Configuración segura de API Key -->
+            <div class="flex items-center gap-2 bg-slate-900 p-1.5 rounded-lg border border-slate-700">
+                <span id="badgeModo" class="text-[11px] px-2 py-0.5 rounded font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    Simulacro
+                </span>
+                <input type="password" id="apiKeyInput" placeholder="API Key OpenAI..." 
+                       oninput="actualizarModo()"
+                       class="bg-transparent text-xs text-slate-200 px-2 py-0.5 focus:outline-none w-36">
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenedor Principal -->
+    <main class="max-w-6xl mx-auto mt-6 px-4 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Columna Izquierda: Entradas + Calculadora Posnet + Turnos (7 columnas) -->
+        <div class="lg:col-span-7 space-y-5">
+            
+            <!-- Bloque 1: Captura y Notas -->
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-xl">
+                <h2 class="text-base font-bold text-white mb-1">1. Consulta del Cliente y Repuesto / Trabajo</h2>
+                <p class="text-xs text-slate-400 mb-3">Subí captura de WhatsApp o anotá el ítem a cotizar (Ej: Kit de Embrague Ranger MWM Original).</p>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center mb-3">
+                    <div class="sm:col-span-5">
+                        <label class="flex flex-col items-center justify-center w-full h-28 border-2 border-slate-600 border-dashed rounded-xl cursor-pointer bg-slate-900/50 hover:bg-slate-900 hover:border-emerald-500 transition">
+                            <div id="uploadPlaceholder" class="flex flex-col items-center justify-center text-center p-2">
+                                <span class="text-xl mb-1">📸</span>
+                                <p class="text-xs text-slate-300 font-medium">Subir Captura WhatsApp</p>
+                                <p class="text-[10px] text-slate-500">Lectura por visión IA</p>
+                            </div>
+                            <img id="previewImagen" class="hidden h-24 object-contain rounded-lg p-1" />
+                            <input id="inputImagen" type="file" accept="image/*" class="hidden" onchange="procesarImagen(event)" />
+                        </label>
+                        <button id="btnBorrarImagen" onclick="quitarImagen()" class="hidden mt-1 text-[11px] text-red-400 hover:underline w-full text-center">
+                            ✕ Quitar captura
+                        </button>
+                    </div>
+
+                    <div class="sm:col-span-7">
+                        <textarea id="inputTexto" rows="4" 
+                            placeholder="Ej: Bomba de embrague / Kit de Embrague Ranger MWM Original. El cliente pregunta precio y cuándo me puede traer el vehículo..."
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bloque 2: Calculadora Rápida de Presupuesto y Posnet -->
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-xl">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        <span>🧮 2. Calculadora de Presupuesto y Financiación</span>
+                    </h2>
+                    <span class="text-[11px] text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                        Cálculo automático activado
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+                    <div class="sm:col-span-5">
+                        <label class="block text-xs text-slate-400 mb-1">Monto Base ($ ARS):</label>
+                        <input type="number" id="inputPrecio" placeholder="Ej: 140000" oninput="calcularCuotasEnVivo()"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-xl p-2.5 text-base font-bold text-emerald-400 focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div class="sm:col-span-7">
+                        <label class="block text-xs text-slate-400 mb-1">¿Ese monto ingresado qué precio es?</label>
+                        <select id="tipoPrecioBase" onchange="calcularCuotasEnVivo()"
+                            class="w-full bg-slate-900 border border-slate-600 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                            <option value="lista">Es el Precio de Lista (Débito / Crédito 1 pago)</option>
+                            <option value="efectivo">Es el Precio Neto (Efectivo / Transferencia)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Vista Previa en Vivo de las Cuotas y Descuentos -->
+                <div id="panelVistaPreviaPrecios" class="mt-4 bg-slate-900/90 border border-slate-700 rounded-xl p-3.5 hidden">
+                    <div class="text-xs font-bold text-slate-300 mb-2 flex justify-between">
+                        <span>Desglose automático que se incluirá en el mensaje:</span>
+                        <button onclick="abrirModal('modalPosnet')" class="text-emerald-400 hover:underline text-[11px]">Ajustar % Posnet</button>
+                    </div>
+                    <div id="gridPreciosCalculados" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs"></div>
+                </div>
+
+                <!-- Casillas de Inclusión en el Mensaje (Turnos y Promos) -->
+                <div class="mt-4 pt-3 border-t border-slate-700/80 flex flex-wrap gap-4 text-xs">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="checkIncluirPrecios" checked class="accent-emerald-500 w-4 h-4 rounded">
+                        <span>Incluir tabla de pagos y cuotas</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="checkIncluirTurno" checked class="accent-emerald-500 w-4 h-4 rounded">
+                        <span>Ofrecer próximo turno (<span id="labelProximoTurno" class="text-emerald-400 font-semibold"></span>)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="checkIncluirPromo" checked class="accent-emerald-500 w-4 h-4 rounded">
+                        <span>Recordar promoción especial activa</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Bloque 3: Estrategia y Botón Generar -->
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-xl space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <button type="button" onclick="seleccionarModo('presupuesto')" id="btn-presupuesto"
+                        class="modo-btn bg-emerald-600/20 border-2 border-emerald-500 text-emerald-300 p-2.5 rounded-xl text-left transition">
+                        <div class="font-bold text-xs">💰 Pasar Presupuesto</div>
+                        <div class="text-[11px] opacity-80">Formato taller con cuotas</div>
+                    </button>
+                    <button type="button" onclick="seleccionarModo('reclamo')" id="btn-reclamo"
+                        class="modo-btn bg-slate-900 border-2 border-slate-700 text-slate-300 p-2.5 rounded-xl text-left hover:border-slate-600 transition">
+                        <div class="font-bold text-xs">🛡️ Calmar Reclamo</div>
+                        <div class="text-[11px] opacity-80">Diplomático y resolutivo</div>
+                    </button>
+                    <button type="button" onclick="seleccionarModo('cobro')" id="btn-cobro"
+                        class="modo-btn bg-slate-900 border-2 border-slate-700 text-slate-300 p-2.5 rounded-xl text-left hover:border-slate-600 transition">
+                        <div class="font-bold text-xs">⏳ Pedir Seña / Turno</div>
+                        <div class="text-[11px] opacity-80">Congelar repuesto y agendar</div>
+                    </button>
+                </div>
+
+                <button onclick="generarRespuesta()" id="btnGenerar"
+                    class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3.5 px-6 rounded-xl shadow-lg shadow-emerald-500/10 transition flex items-center justify-center gap-2 text-sm">
+                    <span>⚡ Generar Mensaje con Precios, Cuotas y Turno</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Columna Derecha: Resultado de WhatsApp (5 columnas) -->
+        <div class="lg:col-span-5 flex flex-col">
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-xl flex-1 flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-base font-bold text-white">Vista Previa de WhatsApp</h2>
+                        <span id="etiquetaEstrategia" class="text-[11px] bg-slate-700 text-slate-300 px-2.5 py-1 rounded-full">
+                            Esperando datos
+                        </span>
+                    </div>
+
+                    <div id="estadoVacio" class="py-16 text-center text-slate-500 border border-dashed border-slate-700 rounded-xl p-6">
+                        <p class="text-sm mb-2">Escribí el repuesto o trabajo (ej: <b>Bomba de embrague</b>), poné <b>140000</b> en la calculadora y tocá el botón verde.</p>
+                        <p class="text-xs text-slate-600">Vas a ver cómo arma el desglose exacto de lista, 3, 6, 9, 12 cuotas, efectivo, promo Mercado Pago y turno disponible.</p>
+                    </div>
+
+                    <div id="contenedorResultado" class="hidden space-y-3">
+                        <div class="bg-slate-900/90 border border-slate-700 p-3 rounded-xl">
+                            <p class="text-[11px] uppercase font-bold text-emerald-400 mb-0.5">Resumen del Asistente:</p>
+                            <p id="textoAnalisis" class="text-xs text-slate-300"></p>
+                        </div>
+
+                        <!-- Burbuja idéntica a WhatsApp Web Oscuro -->
+                        <div class="bg-[#005c4b] text-white p-4 rounded-2xl rounded-tl-none shadow-md">
+                            <p id="textoWhatsApp" class="text-sm whitespace-pre-line leading-relaxed font-sans"></p>
+                            <div class="text-right text-[10px] text-emerald-200/70 mt-2">10:50 a.m. ✓✓</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="accionesResultado" class="hidden mt-5 pt-4 border-t border-slate-700 space-y-2">
+                    <button onclick="copiarAlPortapapeles()" id="btnCopiar"
+                        class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 text-sm">
+                        📋 Copiar Mensaje para WhatsApp
+                    </button>
+                    <button onclick="descontarTurno()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-2 px-4 rounded-xl transition text-xs">
+                        📅 Confirmar que el cliente agendó (Descontar 1 cupo del día)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL 1: CONFIGURAR POSNET / CUOTAS -->
+    <div id="modalPosnet" class="fixed inset-0 bg-black/75 hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="text-base font-bold text-white">💳 Configuración de Posnet y Medios de Pago</h3>
+                <button onclick="cerrarModal('modalPosnet')" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <p class="text-xs text-slate-400">Configurá tus porcentajes según tu cobrador (Mercado Pago, Payway, Fiserv, etc.).</p>
+            
+            <div class="space-y-3 text-xs">
+                <div class="flex justify-between items-center bg-slate-900 p-2.5 rounded-lg">
+                    <span>Descuento Efectivo / Transferencia (% sobre lista):</span>
+                    <input type="number" id="cfgDescuentoEfectivo" value="10.71" step="0.1" class="bg-slate-800 border border-slate-600 rounded p-1.5 w-20 text-right text-emerald-400 font-bold">
+                </div>
+                <div class="flex justify-between items-center bg-slate-900 p-2.5 rounded-lg">
+                    <label class="flex items-center gap-2"><input type="checkbox" id="chk3" checked class="accent-emerald-500"> Recargo en 3 Cuotas (%):</label>
+                    <input type="number" id="cfgRecargo3" value="16.86" step="0.1" class="bg-slate-800 border border-slate-600 rounded p-1.5 w-20 text-right text-white">
+                </div>
+                <div class="flex justify-between items-center bg-slate-900 p-2.5 rounded-lg">
+                    <label class="flex items-center gap-2"><input type="checkbox" id="chk6" checked class="accent-emerald-500"> Recargo en 6 Cuotas (%):</label>
+                    <input type="number" id="cfgRecargo6" value="34.30" step="0.1" class="bg-slate-800 border border-slate-600 rounded p-1.5 w-20 text-right text-white">
+                </div>
+                <div class="flex justify-between items-center bg-slate-900 p-2.5 rounded-lg">
+                    <label class="flex items-center gap-2"><input type="checkbox" id="chk9" class="accent-emerald-500"> Recargo en 9 Cuotas (%):</label>
+                    <input type="number" id="cfgRecargo9" value="52.00" step="0.1" class="bg-slate-800 border border-slate-600 rounded p-1.5 w-20 text-right text-white">
+                </div>
+                <div class="flex justify-between items-center bg-slate-900 p-2.5 rounded-lg">
+                    <label class="flex items-center gap-2"><input type="checkbox" id="chk12" class="accent-emerald-500"> Recargo en 12 Cuotas (%):</label>
+                    <input type="number" id="cfgRecargo12" value="70.00" step="0.1" class="bg-slate-800 border border-slate-600 rounded p-1.5 w-20 text-right text-white">
+                </div>
+            </div>
+            <button onclick="guardarConfigPosnet()" class="w-full bg-emerald-500 text-slate-950 font-bold py-2.5 rounded-xl text-xs">
+                Guardar Porcentajes de Posnet
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL 2: TURNOS Y GOOGLE CALENDAR -->
+    <div id="modalCalendario" class="fixed inset-0 bg-black/75 hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="text-base font-bold text-white">📅 Agenda de Turnos y Horarios</h3>
+                <button onclick="cerrarModal('modalCalendario')" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1">Horario de Atención del Negocio/Taller:</label>
+                    <input type="text" id="cfgHorarioTaller" value="Lunes a Viernes de 8:00 a 12:30 y 14:30 a 18:30 hs" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-400 mb-1">Próximo día disponible:</label>
+                        <input type="text" id="cfgDiaDisponible" value="Lunes 8:00 hs" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-emerald-400 font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Cupos libres ese día:</label>
+                        <input type="number" id="cfgCuposDia" value="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-bold">
+                    </div>
+                </div>
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                    <div class="font-bold text-slate-200 mb-1">🔗 Sincronización con Google Calendar</div>
+                    <p class="text-[11px] text-slate-400 mb-2">Pegá el correo de tu Google Calendar o link de agenda para bloquear turnos automáticamente.</p>
+                    <input type="email" placeholder="taller@gmail.com" value="agenda.mostrador@gmail.com" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-xs text-emerald-300">
+                </div>
+            </div>
+            <button onclick="guardarConfigCalendario()" class="w-full bg-emerald-500 text-slate-950 font-bold py-2.5 rounded-xl text-xs">
+                Actualizar Agenda y Cupos
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL 3: PROMOCIONES ESPECIALES -->
+    <div id="modalPromos" class="fixed inset-0 bg-black/75 hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="text-base font-bold text-white">🏷️ Promociones Especiales Activas</h3>
+                <button onclick="cerrarModal('modalPromos')" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <p class="text-xs text-slate-400">Escribí el recordatorio bancario o promoción que siempre agregás al pie de tus presupuestos:</p>
+            <textarea id="cfgTextoPromo" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white">Si el cliente tiene la tarjeta de Crédito Mercado Pago puede hacer el precio de lista en 3 cuotas sin interés (con esa tarjeta)</textarea>
+            <button onclick="cerrarModal('modalPromos')" class="w-full bg-emerald-500 text-slate-950 font-bold py-2.5 rounded-xl text-xs">
+                Guardar Promoción
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL 4: TUTORIAL DE USO -->
+    <div id="modalTutorial" class="fixed inset-0 bg-black/75 hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="text-base font-bold text-white">🚀 Cómo funciona Mostrador Pro IA</h3>
+                <button onclick="cerrarModal('modalTutorial')" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <ol class="space-y-3 text-xs text-slate-300 list-decimal list-inside leading-relaxed">
+                <li><b class="text-emerald-400">Configurá tu Posnet una sola vez:</b> En la barra superior ajustás tus recargos de 3, 6, 9 o 12 cuotas y el descuento en efectivo/transferencia.</li>
+                <li><b class="text-emerald-400">Subí la captura o anotá el ítem:</b> Cargá la foto del chat de WhatsApp o escribí el repuesto/trabajo (ej: <i>Bomba de embrague</i>).</li>
+                <li><b class="text-emerald-400">Poné el valor en la calculadora:</b> Ingresá el monto (ej: $140.000). El sistema calcula solo el efectivo, las cuotas totales y el valor de cada cuota individual.</li>
+                <li><b class="text-emerald-400">Copiá y vendé:</b> Tocá el botón verde para que la IA arme el mensaje con tus precios exactos, la promo de tarjeta y el próximo turno libre de tu agenda.</li>
+            </ol>
+            <button onclick="cerrarModal('modalTutorial')" class="w-full bg-blue-500 text-slate-950 font-bold py-2.5 rounded-xl text-xs">
+                ¡Entendido, a cotizar!
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let modoActual = 'presupuesto';
+        let imagenBase64 = null;
+
+        window.onload = () => {
+            const guardada = localStorage.getItem('donweb_openai_key');
+            if (guardada) {
+                document.getElementById('apiKeyInput').value = guardada;
+                actualizarModo();
+            }
+            actualizarEtiquetaTurno();
+        };
+
+        function abrirModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).classList.add('flex');
+        }
+
+        function cerrarModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).classList.remove('flex');
+        }
+
+        function guardarConfigPosnet() {
+            calcularCuotasEnVivo();
+            cerrarModal('modalPosnet');
+        }
+
+        function guardarConfigCalendario() {
+            actualizarEtiquetaTurno();
+            cerrarModal('modalCalendario');
+        }
+
+        function actualizarEtiquetaTurno() {
+            const dia = document.getElementById('cfgDiaDisponible').value;
+            const cupos = document.getElementById('cfgCuposDia').value;
+            document.getElementById('labelProximoTurno').textContent = `${dia} - ${cupos} lugares`;
+        }
+
+        function descontarTurno() {
+            let cupos = parseInt(document.getElementById('cfgCuposDia').value) || 0;
+            if (cupos > 1) {
+                document.getElementById('cfgCuposDia').value = cupos - 1;
+            } else {
+                document.getElementById('cfgDiaDisponible').value = 'Martes 8:00 hs';
+                document.getElementById('cfgCuposDia').value = 3;
+            }
+            actualizarEtiquetaTurno();
+            alert('¡Turno agendado! Se actualizó automáticamente tu disponibilidad para el próximo cliente.');
+        }
+
+        function formatearPesos(numero) {
+            return Math.round(numero).toLocaleString('es-AR');
+        }
+
+        function obtenerObjetoPrecios() {
+            const monto = parseFloat(document.getElementById('inputPrecio').value);
+            if (!monto || monto <= 0) return null;
+
+            const tipoBase = document.getElementById('tipoPrecioBase').value;
+            const descEfectivo = parseFloat(document.getElementById('cfgDescuentoEfectivo').value) || 0;
+
+            let precioLista = monto;
+            let precioEfectivo = monto;
+
+            if (tipoBase === 'lista') {
+                precioEfectivo = Math.round((monto * (1 - descEfectivo / 100)) / 500) * 500;
+            } else {
+                precioLista = Math.round((monto / (1 - descEfectivo / 100)) / 50) * 50;
+            }
+
+            const planes = [];
+            [3, 6, 9, 12].forEach(cuotas => {
+                const activo = document.getElementById('chk' + cuotas).checked;
+                const recargo = parseFloat(document.getElementById('cfgRecargo' + cuotas).value) || 0;
+                if (activo) {
+                    const totalFinanciado = Math.round(precioLista * (1 + recargo / 100));
+                    const valorCuota = Math.round(totalFinanciado / cuotas);
+                    planes.push({ cuotas, recargo, totalFinanciado, valorCuota });
+                }
+            });
+
+            return { precioLista, precioEfectivo, planes };
+        }
+
+        function calcularCuotasEnVivo() {
+            const datos = obtenerObjetoPrecios();
+            const panel = document.getElementById('panelVistaPreviaPrecios');
+            const grid = document.getElementById('gridPreciosCalculados');
+
+            if (!datos) {
+                panel.classList.add('hidden');
+                return;
+            }
+
+            panel.classList.remove('hidden');
+            let html = `
+                <div class="bg-slate-800 p-2 rounded border border-slate-700">
+                    <div class="text-slate-400 text-[10px]">Lista (Débito / 1 Pago)</div>
+                    <div class="font-bold text-white text-sm">$${formatearPesos(datos.precioLista)}</div>
+                </div>
+                <div class="bg-emerald-950/40 p-2 rounded border border-emerald-500/40">
+                    <div class="text-emerald-300 text-[10px]">Efectivo / Transferencia</div>
+                    <div class="font-bold text-emerald-400 text-sm">$${formatearPesos(datos.precioEfectivo)}</div>
+                </div>
+            `;
+
+            datos.planes.forEach(p => {
+                html += `
+                    <div class="bg-slate-800 p-2 rounded border border-slate-700">
+                        <div class="text-slate-400 text-[10px]">En ${p.cuotas} cuotas (+${p.recargo}%)</div>
+                        <div class="font-bold text-white text-xs">$${formatearPesos(p.totalFinanciado)}</div>
+                        <div class="text-emerald-400 text-[10px]">${p.cuotas} de $${formatearPesos(p.valorCuota)}</div>
+                    </div>
+                `;
+            });
+
+            grid.innerHTML = html;
+        }
+
+        function armarBloqueTextoPrecios() {
+            const datos = obtenerObjetoPrecios();
+            const incluirPrecios = document.getElementById('checkIncluirPrecios').checked;
+            const incluirPromo = document.getElementById('checkIncluirPromo').checked;
+            const incluirTurno = document.getElementById('checkIncluirTurno').checked;
+
+            let bloques = [];
+
+            if (incluirPrecios && datos) {
+                let txt = `Precio de lista débito o crédito en 1 pago $${formatearPesos(datos.precioLista)}`;
+                datos.planes.forEach(p => {
+                    txt += `\nEn ${p.cuotas} cuotas $${formatearPesos(p.totalFinanciado)} (${p.cuotas} cuotas de $${formatearPesos(p.valorCuota)})`;
+                });
+                txt += `\n\nSino efectivo o transferencia $${formatearPesos(datos.precioEfectivo)}`;
+                bloques.push(txt);
+            }
+
+            if (incluirPromo) {
+                const promo = document.getElementById('cfgTextoPromo').value.trim();
+                if (promo) bloques.push(promo);
+            }
+
+            if (incluirTurno) {
+                const dia = document.getElementById('cfgDiaDisponible').value;
+                const cupos = document.getElementById('cfgCuposDia').value;
+                bloques.push(`📅 *Disponibilidad de turno:* Próximo lugar libre el *${dia}* (quedan ${cupos} cupos ese día).`);
+            }
+
+            return bloques.join('\n\n');
+        }
+
+        function actualizarModo() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+            const badge = document.getElementById('badgeModo');
+            if (key.startsWith('sk-')) {
+                localStorage.setItem('donweb_openai_key', key);
+                badge.textContent = '🟢 OpenAI Activo';
+                badge.className = 'text-[11px] px-2 py-0.5 rounded font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+            } else {
+                localStorage.removeItem('donweb_openai_key');
+                badge.textContent = 'Simulacro';
+                badge.className = 'text-[11px] px-2 py-0.5 rounded font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+            }
+        }
+
+        function seleccionarModo(modo) {
+            modoActual = modo;
+            document.querySelectorAll('.modo-btn').forEach(btn => {
+                btn.className = 'modo-btn bg-slate-900 border-2 border-slate-700 text-slate-300 p-2.5 rounded-xl text-left hover:border-slate-600 transition';
+            });
+            const activo = document.getElementById('btn-' + modo);
+            activo.className = 'modo-btn bg-emerald-600/20 border-2 border-emerald-500 text-emerald-300 p-2.5 rounded-xl text-left transition';
+        }
+
+        function procesarImagen(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                imagenBase64 = e.target.result;
+                document.getElementById('previewImagen').src = imagenBase64;
+                document.getElementById('previewImagen').classList.remove('hidden');
+                document.getElementById('uploadPlaceholder').classList.add('hidden');
+                document.getElementById('btnBorrarImagen').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function quitarImagen() {
+            imagenBase64 = null;
+            document.getElementById('inputImagen').value = '';
+            document.getElementById('previewImagen').classList.add('hidden');
+            document.getElementById('uploadPlaceholder').classList.remove('hidden');
+            document.getElementById('btnBorrarImagen').classList.add('hidden');
+        }
+
+        async function generarRespuesta() {
+            const texto = document.getElementById('inputTexto').value.trim();
+            const precio = document.getElementById('inputPrecio').value.trim();
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            const btnGenerar = document.getElementById('btnGenerar');
+
+            if (!texto && !imagenBase64 && !precio) {
+                alert('Por favor, ingresá el nombre del repuesto/trabajo, una captura o un precio en la calculadora.');
+                return;
+            }
+
+            const bloqueCalculado = armarBloqueTextoPrecios();
+
+            btnGenerar.disabled = true;
+            btnGenerar.innerHTML = '⏳ Calculando financiación y armando mensaje...';
+            document.getElementById('estadoVacio').classList.add('hidden');
+            document.getElementById('contenedorResultado').classList.remove('hidden');
+
+            try {
+                if (apiKey.startsWith('sk-')) {
+                    await llamarOpenAIReal(apiKey, texto, imagenBase64, modoActual, bloqueCalculado);
+                } else {
+                    await simularRespuestaTaller(texto, bloqueCalculado, modoActual);
+                }
+                document.getElementById('accionesResultado').classList.remove('hidden');
+            } catch (error) {
+                document.getElementById('textoAnalisis').textContent = 'Error de conexión con la API.';
+                document.getElementById('textoWhatsApp').textContent = error.message;
+            } finally {
+                btnGenerar.disabled = false;
+                btnGenerar.innerHTML = '⚡ Generar Mensaje con Precios, Cuotas y Turno';
+            }
+        }
+
+        async function simularRespuestaTaller(texto, bloqueCalculado, modo) {
+            await new Promise(r => setTimeout(r, 600));
+            const tituloItem = texto ? texto : 'Presupuesto del trabajo / repuesto';
+
+            if (modo === 'presupuesto') {
+                document.getElementById('etiquetaEstrategia').textContent = 'Cotización Posnet + Agenda';
+                document.getElementById('textoAnalisis').textContent = 'Se integró el cálculo exacto de lista, cuotas con el valor por cuota individual, descuento en efectivo, promo de tarjeta y próximo turno.';
+                document.getElementById('textoWhatsApp').textContent = `${tituloItem}\n${bloqueCalculado}`;
+            } else if (modo === 'reclamo') {
+                document.getElementById('etiquetaEstrategia').textContent = 'Contención + Turno de Revisión';
+                document.getElementById('textoAnalisis').textContent = 'Respuesta diplomática priorizando garantías y asignando el próximo cupo libre de tu calendario.';
+                document.getElementById('textoWhatsApp').textContent = `¡Hola! Te entiendo perfectamente y quédate tranquilo que todos nuestros trabajos cuentan con respaldo.\n\nRespecto a: ${tituloItem}, traelo directamente para que lo revisemos sin cargo.\n\n${bloqueCalculado}`;
+            } else {
+                document.getElementById('etiquetaEstrategia').textContent = 'Reserva de Repuesto y Turno';
+                document.getElementById('textoAnalisis').textContent = 'Mensaje enfocado en congelar el valor del repuesto mediante seña y bloquear el lugar en la agenda.';
+                document.getElementById('textoWhatsApp').textContent = `¡Hola! Para dejarte reservado el repuesto/trabajo (${tituloItem}) y congelar el valor, te paso las opciones disponibles:\n\n${bloqueCalculado}\n\nApenas me confirmes qué opción preferís te paso el alias para la seña y ya te bloqueo el turno.`;
+            }
+        }
+
+        async function llamarOpenAIReal(apiKey, textoUsuario, base64Img, modo, bloqueCalculado) {
+            const contenidoUsuario = [
+                {
+                    type: "text",
+                    text: `Sos el asistente de un taller/comercio en Argentina.
+                    Ítem o consulta: "${textoUsuario || 'Ver captura de pantalla'}".
+                    Modo elegido: ${modo}.
+                    Datos exactos de Posnet, Promos y Turnos que DEBÉS incluir respetando todos los números sin inventar precios:
+                    """
+                    ${bloqueCalculado}
+                    """
+                    Respondé en JSON estricto con dos claves: "analisis" (1 oración explicando cómo estructuraste la respuesta) y "mensaje" (el mensaje listo para enviar por WhatsApp, directo al grano y profesional).`
+                }
+            ];
+
+            if (base64Img) {
+                contenidoUsuario.push({ type: "image_url", image_url: { url: base64Img } });
+            }
+
+            const respuesta = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    response_format: { type: "json_object" },
+                    messages: [{ role: "user", content: contenidoUsuario }]
+                })
+            });
+
+            const data = await respuesta.json();
+            if (data.error) throw new Error(data.error.message);
+            const resultado = JSON.parse(data.choices[0].message.content);
+            document.getElementById('etiquetaEstrategia').textContent = 'OpenAI + Calculadora Posnet';
+            document.getElementById('textoAnalisis').textContent = resultado.analisis;
+            document.getElementById('textoWhatsApp').textContent = resultado.mensaje;
+        }
+
+        function copiarAlPortapapeles() {
+            const texto = document.getElementById('textoWhatsApp').textContent;
+            navigator.clipboard.writeText(texto);
+            const btn = document.getElementById('btnCopiar');
+            btn.innerHTML = '✅ ¡Copiado! Pegalo directo en WhatsApp';
+            setTimeout(() => {
+                btn.innerHTML = '📋 Copiar Mensaje para WhatsApp';
+            }, 2500);
+        }
+    </script>
+</body>
+</html>
